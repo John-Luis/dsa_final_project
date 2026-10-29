@@ -2,7 +2,7 @@
 
 ## Request path
 
-A server-rendered Flask interface handles requests without JavaScript. Flask validates form input and CSRF tokens. SQLite stores programs, counters, requests, daily sequences, events, and announcements. The app initializes the schema on first launch and uses parameterized SQL.
+A server-rendered Flask interface handles requests. Small local JavaScript modules progressively enhance the staff table and TV monitor with polling, a live clock, and media playback. Python generates the report SVG charts; chart data and all queue operations remain server-side. Flask validates form input and CSRF tokens. SQLite stores programs, counters, requests, daily sequences, events, and announcements. The app initializes the schema on first launch and uses parameterized SQL.
 
 Programs are represented by a normalized `programs` table with foreign keys from requests and counters. This provides separate categories without duplicating an entire physical requests table for each program. Daily sequence numbers have a `(day, program)` primary key; requests enforce a unique `(day, ticket)` pair. Confirmation links use independent random UUID tokens. Know the token to view a receipt; names/contact details are not displayed there.
 
@@ -48,3 +48,14 @@ SQLite is the source of truth. `BEGIN IMMEDIATE` serializes writes for number al
 - CSV exports day, ticket, program, status, outcome, and timestamps, not applicant identity/contact details. Cells are protected against spreadsheet formula interpretation.
 
 The report supports operational analysis. It does not implement a government-prescribed DOLE report template.
+
+
+## Live views, media, and mail
+
+`/api/monitor` deliberately serializes only ticket numbers, program/counter labels, announcements, timestamps, and public playlist URLs. It never returns applicant records or private receipt IDs. Counter up-next is the first waiting entry eligible for that counter. `/api/staff/queue` requires a staff session and returns autoescaped Jinja fragments using the same filters as the initial page. Polling updates only read-only regions and preserves input drafts. Both pollers display a connection/session warning after failed updates. The TV player is only rebuilt when the playlist changes, not when queue data changes.
+
+Media is stored in ignored instance/media under generated filenames; SQLite stores metadata and upload order. Staff-only uploads require CSRF, a bounded size/duration, and an allowed file signature. Public serving is by database ID; user filenames are never used as filesystem paths. This checks containers/signatures, not a full media-transcoding or malware-scanning pipeline. Videos are muted for browser autoplay and advance on end or their configured limit. If playback fails, the display shows a fallback until the next item. The built-in announcements return when the custom playlist is empty.
+
+An additive `email_outbox` table stores the confirmation payload and delivery status after the ticket is committed. Conditional claiming prevents concurrent retries for the same message; Sent is terminal for the retry endpoint. SMTP uses verified TLS, and failures are recorded with generic errors to avoid leaking provider details or credentials. Without SMTP, .eml files and staff previews allow inspection while clearly showing no email was sent. No retroactive emails or automatic retries are performed. Confirmation links use an explicitly configured public base URL rather than an untrusted incoming Host header.
+
+Line charts aggregate the entire selected registration range into at most 14 contiguous date buckets, including empty periods. Completed counts reflect the current status of the same registration cohorts, not a count of completions performed on each plotted day. Pie slices show the selected requests’ current status distribution. Empty reports display zero counts and a no-data pie.
