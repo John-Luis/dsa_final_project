@@ -125,4 +125,89 @@ def create_app(test_config=None):
 
 
 def register_staff(app):
-    pass
+    @app.route('/staff/login', methods=['GET','POST'])
+    def login():
+        if request.method == 'POST':
+            if check_password_hash(app.config['STAFF_PASSWORD_HASH'],request.form.get('password','')):
+                session.clear()
+                session['staff'] = True
+                session['csrf'] = secrets.token_hex(32)
+                return redirect(url_for('dashboard'),code=303)
+            flash('Incorrect staff password. Please try again.','error')
+        return render_template('login.html')
+
+    @app.post('/staff/logout')
+    def logout():
+        session.clear()
+        return redirect(url_for('home'),code=303)
+
+    @app.get('/staff')
+    @staff_required
+    def dashboard():
+        db = get_db()
+        day = request.args.get('day',today())
+        try:
+            datetime.strptime(day,'%Y-%m-%d')
+        except ValueError:
+            abort(400,'Choose a valid date.')
+        program, status, search = [request.args.get(k,'').strip() for k in ('program','status','search')]
+        sql, params = 'SELECT r.*,p.name program_name FROM requests r JOIN programs p ON r.program=p.code WHERE day=?', [day]
+        if program:
+            sql += ' AND program=?'
+            params.append(program)
+        if status:
+            sql += ' AND status=?'
+            params.append(status)
+        if search:
+            sql += ' AND (r.name LIKE ? OR ticket LIKE ?)'
+            params.extend(['%'+search+'%']*2)
+        rows = db.execute(sql+' ORDER BY queued_at,id',params).fetchall()
+        stats = {r['status']:r['n'] for r in db.execute('SELECT status,COUNT(*) n FROM requests WHERE day=? GROUP BY status',(day,))}
+        counters = db.execute("SELECT c.*,r.ticket,r.id request_id,r.status FROM counters c LEFT JOIN requests r ON r.counter_id=c.id AND r.status IN ('Called','For Assessment') ORDER BY c.id").fetchall()
+        return render_template('dashboard.html',rows=rows,stats=stats,counters=counters,day=day,
+            announcement=db.execute("SELECT value FROM settings WHERE key='announcement'").fetchone()[0])
+
+    @app.post('/staff/call/<int:counter>')
+    @staff_required
+    def call(counter):
+        try:
+            ticket = call_next(get_db(),counter)
+            flash(f'{ticket} called to Counter {counter}.','success')
+        except ValueError as error:
+            flash(str(error),'error')
+        return redirect(url_for('dashboard'),code=303)
+
+    @app.post('/staff/request/<key>/<action>')
+    @staff_required
+    def update_request(key,action):
+        try:
+            transition(get_db(),key,action,request.form.get('outcome','Served'))
+            flash('Transaction updated.','success')
+        except ValueError as error:
+            flash(str(error),'error')
+        return redirect(url_for('dashboard'),code=303)
+
+    @app.get('/staff/request/<key>')
+    @staff_required
+    def detail(key):
+        db = get_db()
+        row = db.execute('SELECT r.*,p.name program_name FROM requests r JOIN programs p ON p.code=r.program WHERE r.id=?',(key,)).fetchone()
+        if not row:
+            abort(404)
+        neighbors = queue(db,row['day']).neighbors(key) if row['status']=='Waiting' else (None,None)
+        events = db.execute('SELECT * FROM events WHERE request_id=? ORDER BY id',(key,)).fetchall()
+        return render_template('detail.html',row=row,neighbors=neighbors,events=events)
+
+    @app.post('/staff/announcement')
+    @staff_required
+    def announcement():
+        text = request.form.get('announcement','').strip()
+        if not 1 <= len(text) <= 400:
+            flash('Announcements must contain 1–400 characters.','error')
+        else:
+            db = get_db()
+            db.execute("UPDATE settings SET value=? WHERE key='announcement'",(text,))
+            db.commit()
+            flash('Public announcement updated.','success')
+        return redirect(url_for('dashboard'),code=303)
+
