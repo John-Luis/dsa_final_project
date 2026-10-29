@@ -4,7 +4,7 @@ A working **Python / Flask / SQLite** prototype for a DSA final project: a PESO 
 
 ## Run it
 
-Requires Python 3.11+ with `venv` and `pip`. No Node.js, Google credentials, or external database is needed.
+Requires Python 3.11+ with `venv` and `pip`. The pinned `tzdata` dependency supplies Philippine time-zone data on Windows, where the system IANA database is usually absent. No Node.js, Google credentials, or external database is needed.
 
 ```sh
 cd /workspace/dsa_final_project
