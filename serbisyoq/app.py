@@ -252,7 +252,11 @@ def register_staff(app):
             writer.writerow(fields)
             writer.writerows([[csv_safe(r[k]) for k in fields] for r in rows])
             return Response(output.getvalue(),mimetype='text/csv',headers={'Content-Disposition':f'attachment; filename="serbisyoq-{start}-to-{end}.csv"'})
-        return render_template('reports.html',summary=summarize(rows),start=start,end=end)
+        from .charts import chart_data, line_svg, pie_svg, STATUS_COLORS
+        charts=chart_data(rows,start,end)
+        return render_template('reports.html',summary=summarize(rows),start=start,end=end,
+            charts=charts,line_chart=line_svg(charts['trend']),pie_chart=pie_svg(charts['statuses']),
+            status_colors=STATUS_COLORS)
 
 
     @app.get('/staff/email')
