@@ -32,6 +32,14 @@ def create_app(test_config=None):
         SECRET_KEY=os.environ.get('SERBISYOQ_SECRET_KEY') or secrets.token_hex(32),
         STAFF_PASSWORD_HASH=generate_password_hash(os.environ.get('SERBISYOQ_STAFF_PASSWORD','peso-demo')),
         DEMO_MODE=not bool(os.environ.get('SERBISYOQ_STAFF_PASSWORD')),
+        SMTP_HOST=os.environ.get('SMTP_HOST',''),
+        SMTP_PORT=int(os.environ.get('SMTP_PORT','587')),
+        SMTP_USERNAME=os.environ.get('SMTP_USERNAME',''),
+        SMTP_PASSWORD=os.environ.get('SMTP_PASSWORD',''),
+        SMTP_FROM=os.environ.get('SMTP_FROM',''),
+        SMTP_SECURITY=os.environ.get('SMTP_SECURITY','starttls'),
+        PUBLIC_BASE_URL=os.environ.get('SERBISYOQ_PUBLIC_URL',''),
+        MAIL_PREVIEW_DIR=str(Path(app.instance_path)/'mail-preview'),
         MAX_CONTENT_LENGTH=32 * 1024,
         SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax')
     if test_config:
@@ -92,6 +100,8 @@ def create_app(test_config=None):
                 errors.append('Confirm that you reviewed the requirements and consent to processing.')
             if not errors:
                 key = submit(db,selected,name,email,phone,concern)
+                from .mail import queue_confirmation
+                queue_confirmation(db,key)
                 return redirect(url_for('receipt',key=key),code=303)
         return render_template('intake.html',program=program,errors=errors)
 
@@ -103,7 +113,7 @@ def create_app(test_config=None):
             abort(404)
         waiting = queue(db,row['day']).to_list()
         ahead = next((sum(x['program']==row['program'] for x in waiting[:i]) for i,x in enumerate(waiting) if x['id']==key),None)
-        return render_template('receipt.html',row=row,ahead=ahead)
+        return render_template('receipt.html',row=row,ahead=ahead,mail=db.execute('SELECT status FROM email_outbox WHERE request_id=?',(key,)).fetchone())
 
     @app.get('/qr.svg')
     def qr():
@@ -246,3 +256,18 @@ def register_staff(app):
             writer.writerows([[csv_safe(r[k]) for k in fields] for r in rows])
             return Response(output.getvalue(),mimetype='text/csv',headers={'Content-Disposition':f'attachment; filename="serbisyoq-{start}-to-{end}.csv"'})
         return render_template('reports.html',summary=summarize(rows),start=start,end=end)
+
+
+    @app.get('/staff/email')
+    @staff_required
+    def email_outbox():
+        rows = get_db().execute('SELECT m.*,r.ticket,r.day FROM email_outbox m JOIN requests r ON r.id=m.request_id ORDER BY m.updated_at DESC LIMIT 100').fetchall()
+        return render_template('email.html',rows=rows,smtp_enabled=bool(app.config['SMTP_HOST']))
+
+    @app.post('/staff/email/<key>/retry')
+    @staff_required
+    def retry_email(key):
+        from .mail import deliver_confirmation
+        result = deliver_confirmation(get_db(),key)
+        flash('Confirmation processed. Check its delivery status below.' if result else 'Message was not sent. Check its status and SMTP settings.','success' if result else 'error')
+        return redirect(url_for('email_outbox'),code=303)
