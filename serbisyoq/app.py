@@ -211,3 +211,25 @@ def register_staff(app):
             flash('Public announcement updated.','success')
         return redirect(url_for('dashboard'),code=303)
 
+
+    @app.get('/staff/reports')
+    @staff_required
+    def reports():
+        from .reporting import summarize, csv_safe
+        start, end = request.args.get('start',today()), request.args.get('end',today())
+        try:
+            datetime.strptime(start,'%Y-%m-%d')
+            datetime.strptime(end,'%Y-%m-%d')
+            if start > end:
+                raise ValueError()
+        except ValueError:
+            abort(400,'Choose a valid date range with the start on or before the end.')
+        rows = get_db().execute('SELECT r.*,p.name program_name FROM requests r JOIN programs p ON r.program=p.code WHERE day BETWEEN ? AND ? ORDER BY created_at,id',(start,end)).fetchall()
+        if request.args.get('export') == 'csv':
+            output = io.StringIO(newline='')
+            writer = csv.writer(output)
+            fields = ['day','ticket','program_name','status','outcome','created_at','called_at','completed_at']
+            writer.writerow(fields)
+            writer.writerows([[csv_safe(r[k]) for k in fields] for r in rows])
+            return Response(output.getvalue(),mimetype='text/csv',headers={'Content-Disposition':f'attachment; filename="serbisyoq-{start}-to-{end}.csv"'})
+        return render_template('reports.html',summary=summarize(rows),start=start,end=end)
