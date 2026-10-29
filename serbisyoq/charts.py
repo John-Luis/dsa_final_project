@@ -18,7 +18,7 @@ def chart_data(rows,start,end):
     arrivals=Counter(r['day'] for r in rows)
     completed=Counter(r['day'] for r in rows if r['status']=='Completed')
     while cursor<=last:
-        stop=min(last,cursor+timedelta(days=span-1))
+        stop=cursor+timedelta(days=min(span-1,(last-cursor).days))
         # Count recorded days rather than iterating over potentially large empty date ranges.
         left,right=cursor.isoformat(),stop.isoformat()
         buckets.append(dict(label=cursor.strftime('%b %d'),start=left,end=right,

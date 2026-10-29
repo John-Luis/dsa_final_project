@@ -3,7 +3,7 @@ import io
 import os
 import re
 import secrets
-from datetime import datetime
+from datetime import date, datetime
 from functools import wraps
 from pathlib import Path
 
@@ -238,8 +238,8 @@ def register_staff(app):
         from .reporting import summarize, csv_safe
         start, end = request.args.get('start',today()), request.args.get('end',today())
         try:
-            datetime.strptime(start,'%Y-%m-%d')
-            datetime.strptime(end,'%Y-%m-%d')
+            date.fromisoformat(start)
+            date.fromisoformat(end)
             if start > end:
                 raise ValueError()
         except ValueError:
@@ -272,3 +272,12 @@ def register_staff(app):
         result = deliver_confirmation(get_db(),key)
         flash('Confirmation processed. Check its delivery status below.' if result else 'Message was not sent. Check its status and SMTP settings.','success' if result else 'error')
         return redirect(url_for('email_outbox'),code=303)
+
+
+    @app.get('/staff/email/<key>')
+    @staff_required
+    def email_preview(key):
+        row=get_db().execute('SELECT * FROM email_outbox WHERE request_id=?',(key,)).fetchone()
+        if not row:
+            abort(404)
+        return render_template('email_preview.html',row=row)
