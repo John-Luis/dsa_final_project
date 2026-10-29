@@ -3,7 +3,7 @@ import io
 import os
 import re
 import secrets
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
@@ -236,7 +236,8 @@ def register_staff(app):
     @staff_required
     def reports():
         from .reporting import summarize, csv_safe
-        start, end = request.args.get('start',today()), request.args.get('end',today())
+        start = request.args.get('start',(date.fromisoformat(today())-timedelta(days=6)).isoformat())
+        end = request.args.get('end',today())
         try:
             date.fromisoformat(start)
             date.fromisoformat(end)
