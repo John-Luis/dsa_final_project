@@ -120,6 +120,19 @@ def create_app(test_config=None):
         announcement = db.execute("SELECT value FROM settings WHERE key='announcement'").fetchone()[0]
         return render_template('monitor.html',counters=counters,waiting=waiting[:8],total=len(waiting),announcement=announcement)
 
+    @app.cli.command('seed-demo')
+    def seed_demo_command():
+        """Add fictional demonstration records only when the database is empty."""
+        import click
+        from .demo import seed_demo
+        click.echo('Added 9 fictional demo requests.' if seed_demo(get_db()) else 'Database already has requests; no records changed.')
+
+    @app.errorhandler(400)
+    @app.errorhandler(404)
+    @app.errorhandler(413)
+    def friendly_error(error):
+        return render_template('error.html',error=error),error.code
+
     register_staff(app)
     return app
 
