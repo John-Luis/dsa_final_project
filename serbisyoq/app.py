@@ -40,6 +40,7 @@ def create_app(test_config=None):
         SMTP_SECURITY=os.environ.get('SMTP_SECURITY','starttls'),
         PUBLIC_BASE_URL=os.environ.get('SERBISYOQ_PUBLIC_URL',''),
         MAIL_PREVIEW_DIR=str(Path(app.instance_path)/'mail-preview'),
+        MEDIA_DIR=str(Path(app.instance_path)/'media'),
         MAX_CONTENT_LENGTH=32 * 1024,
         SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax')
     if test_config:
@@ -50,6 +51,8 @@ def create_app(test_config=None):
 
     @app.before_request
     def csrf_check():
+        if request.endpoint == 'media_add':
+            request.max_content_length = 26 * 1024 * 1024
         if 'csrf' not in session:
             session['csrf'] = secrets.token_hex(32)
         if request.method == 'POST' and not secrets.compare_digest(session['csrf'],request.form.get('csrf','')):
@@ -144,6 +147,8 @@ def create_app(test_config=None):
         return render_template('error.html',error=error),error.code
 
     register_staff(app)
+    from .media import register_media
+    register_media(app,staff_required)
     return app
 
 

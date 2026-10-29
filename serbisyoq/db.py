@@ -56,7 +56,8 @@ def init_db():
     Path(current_app.config['DATABASE']).parent.mkdir(parents=True, exist_ok=True)
     db = get_db()
     from .mail import MAIL_SCHEMA
-    db.executescript(SCHEMA + MAIL_SCHEMA)
+    from .media import MEDIA_SCHEMA
+    db.executescript(SCHEMA + MAIL_SCHEMA + MEDIA_SCHEMA)
     db.executemany('INSERT OR IGNORE INTO programs VALUES (?,?,?,?,?)', PROGRAMS)
     db.executemany('INSERT OR IGNORE INTO counters VALUES (?,?,?)',
                    [(1,'Jobseekers','P'), (2,'SPES assistance','S'), (3,'Employers','E')])

@@ -34,7 +34,7 @@ class StructuresTest(unittest.TestCase):
 class AppTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.app = create_app({'TESTING':True,'DATABASE':str(Path(self.tmp.name)/'test.sqlite'),'SECRET_KEY':'test-only','MAIL_PREVIEW_DIR':str(Path(self.tmp.name)/'mail')})
+        self.app = create_app({'TESTING':True,'DATABASE':str(Path(self.tmp.name)/'test.sqlite'),'SECRET_KEY':'test-only','MAIL_PREVIEW_DIR':str(Path(self.tmp.name)/'mail'),'MEDIA_DIR':str(Path(self.tmp.name)/'media')})
         self.client = self.app.test_client()
 
     def tearDown(self):
