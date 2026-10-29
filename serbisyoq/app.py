@@ -127,11 +127,13 @@ def create_app(test_config=None):
 
     @app.get('/monitor')
     def monitor():
-        db = get_db()
-        counters = db.execute("SELECT c.*,r.ticket,r.status FROM counters c LEFT JOIN requests r ON r.counter_id=c.id AND r.status IN ('Called','For Assessment') ORDER BY c.id").fetchall()
-        waiting = queue(db).to_list()
-        announcement = db.execute("SELECT value FROM settings WHERE key='announcement'").fetchone()[0]
-        return render_template('monitor.html',counters=counters,waiting=waiting[:8],total=len(waiting),announcement=announcement)
+        from .display import monitor_snapshot
+        return render_template('monitor.html',state=monitor_snapshot(get_db()))
+
+    @app.get('/api/monitor')
+    def monitor_data():
+        from .display import monitor_snapshot
+        return monitor_snapshot(get_db())
 
     @app.cli.command('seed-demo')
     def seed_demo_command():

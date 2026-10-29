@@ -19,7 +19,8 @@ class MediaTest(unittest.TestCase):
             self.assertEqual(row['kind'],'image')
             self.assertTrue(row['filename'].endswith('.png'))
             key=row['id']
-        self.assertEqual(self.client.get(f'/media/{key}').mimetype,'image/png')
+        with self.client.get(f'/media/{key}') as response:
+            self.assertEqual(response.mimetype,'image/png')
         self.post(f'/staff/media/{key}/delete')
         self.assertEqual(self.client.get(f'/media/{key}').status_code,404)
 

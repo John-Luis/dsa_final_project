@@ -141,7 +141,7 @@ class AppTest(unittest.TestCase):
         self.assertIn(b'P-001',page.data)
         self.assertNotIn(b'PRIVATE APPLICANT',page.data)
         self.assertNotIn(b'demo@example.com',page.data)
-        self.assertIn(b'http-equiv="refresh"',page.data)
+        self.assertIn(b'monitor.js',page.data)
 
     def test_admin_flow_search_announcements_and_reports(self):
         key=self.add()
